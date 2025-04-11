@@ -30,6 +30,7 @@ public class EnhancedMeshGenerator : MonoBehaviour
     public List<Matrix4x4> GetMatrices() => matrices;
     public List<int> GetColliderIds() => colliderIds;
     public Vector3 GetPlayerSize() => new Vector3(width, height, depth);
+    
     // Camera reference
     public PlayerCameraFollow cameraFollow;
     
@@ -52,6 +53,12 @@ public class EnhancedMeshGenerator : MonoBehaviour
     private bool canJump = true;
     public float gravityScale = 2f;
     public float airMovementMultiplier = 0.5f;
+
+    // For Fireballs
+    public GameObject fireballPrefab;
+    private bool canShootFireballs = false;
+    private float lastFireballTime = 0f;
+    public float fireballCooldown = 0.5f;
 
     void Start()
     {
@@ -118,7 +125,7 @@ public class EnhancedMeshGenerator : MonoBehaviour
             new Vector3(0, 0, depth),   // Bottom back left - 3
             
             // Top face vertices
-            new Vector3(0, height, 0),       // Top front left - 4
+                       new Vector3(0, height, 0),       // Top front left - 4
             new Vector3(width, height, 0),   // Top front right - 5
             new Vector3(width, height, depth),// Top back right - 6
             new Vector3(0, height, depth)    // Top back left - 7
@@ -237,7 +244,7 @@ public class EnhancedMeshGenerator : MonoBehaviour
                 new Vector3(width * scale.x, height * scale.y, depth * scale.z), 
                 false);
             
-            // Create transformation matrix
+            //             // Create transformation matrix
             Matrix4x4 boxMatrix = Matrix4x4.TRS(position, rotation, scale);
             matrices.Add(boxMatrix);
             colliderIds.Add(id);
@@ -335,6 +342,12 @@ public class EnhancedMeshGenerator : MonoBehaviour
         {
             cameraFollow.SetPlayerPosition(pos);
         }
+
+        // Fireball shooting logic
+        if (canShootFireballs && Input.GetKeyDown(KeyCode.F))
+        {
+            ShootFireball();
+        }
     }
         
     bool CheckCollisionAt(int id, Vector3 position)
@@ -392,5 +405,26 @@ public class EnhancedMeshGenerator : MonoBehaviour
         colliderIds.Add(id);
         
         CollisionManager.Instance.UpdateMatrix(id, boxMatrix);
+    }
+
+    void ShootFireball()
+    {
+        if (Time.time - lastFireballTime < fireballCooldown) return;
+
+        lastFireballTime = Time.time;
+
+        Vector3 playerPos = matrices[colliderIds.IndexOf(playerID)].GetPosition();
+        Vector3 fireDirection = Vector3.right; // Default to right
+
+        // Get facing direction based on movement input
+        float horizontal = Input.GetAxis("Horizontal");
+        if (Mathf.Abs(horizontal) > 0.1f)
+        {
+            fireDirection = new Vector3(Mathf.Sign(horizontal), 0, 0);
+        }
+
+        GameObject fireballObj = Instantiate(fireballPrefab);
+        Fireball fireball = fireballObj.GetComponent<Fireball>();
+        fireball.Initialize(playerPos + fireDirection, fireDirection);
     }
 }

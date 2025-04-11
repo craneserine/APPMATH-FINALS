@@ -3,6 +3,21 @@ using UnityEngine;
 
 public class EnemyManager : MonoBehaviour
 {
+    private static EnemyManager _instance;
+    public static EnemyManager Instance
+    {
+        get
+        {
+            if (_instance == null)
+            {
+                GameObject go = new GameObject("EnemyManager");
+                _instance = go.AddComponent<EnemyManager>();
+                DontDestroyOnLoad(go);
+            }
+            return _instance;
+        }
+    }
+
     public Material enemyMaterial;
     public int enemyCount = 5;
     public float enemySize = 1f;
@@ -20,7 +35,6 @@ public class EnemyManager : MonoBehaviour
     private List<float> moveDistances = new List<float>();
     private List<Vector3> startPositions = new List<Vector3>();
     private float lastDamageTime;
-    private EnhancedMeshGenerator meshGen; // Cache reference
 
     void Start()
     {
@@ -29,7 +43,6 @@ public class EnemyManager : MonoBehaviour
             enemyMaterial.enableInstancing = true;
         }
 
-        meshGen = FindObjectOfType<EnhancedMeshGenerator>(); // Get reference once
         CreateEnemyMesh();
         SpawnEnemies();
         lastDamageTime = -damageCooldown;
@@ -69,206 +82,74 @@ public class EnemyManager : MonoBehaviour
 
     void SpawnEnemies()
     {
-        if (meshGen == null) return;
-
-        // Get player's starting X position (center is at x=0)
-        float playerStartX = 0f;
-
+        // Your existing enemy spawning logic
         for (int i = 0; i < enemyCount; i++)
         {
-            Vector3 position;
-            bool positionValid;
-            int attempts = 0;
-            const int maxAttempts = 50;
-
-            do
-            {
-                // Only spawn on right side (positive X) of player
-                position = new Vector3(
-                    Random.Range(playerStartX + 5f, meshGen.maxX - spawnPadding), // Start 5 units right of player
-                    meshGen.groundY + meshGen.height, 
-                    meshGen.constantZPosition
-                );
-
-                positionValid = true;
-                
-                for (int j = 0; j < enemyMatrices.Count; j++)
-                {
-                    Vector3 otherPos = enemyMatrices[j].GetPosition();
-                    if (Vector3.Distance(position, otherPos) < spawnPadding * 2f)
-                    {
-                        positionValid = false;
-                        break;
-                    }
-                }
-
-                attempts++;
-                if (attempts >= maxAttempts) break;
-
-            } while (!positionValid && attempts < maxAttempts);
-
-            if (!positionValid) continue;
-
-            Quaternion rotation = Quaternion.identity;
-            Vector3 scale = Vector3.one * enemySize;
-
-            int id = CollisionManager.Instance.RegisterCollider(
-                position,
-                new Vector3(enemySize, meshGen.height, enemySize),
-                false);
-
-            Matrix4x4 enemyMatrix = Matrix4x4.TRS(position, rotation, scale);
-            enemyMatrices.Add(enemyMatrix);
-            enemyColliderIds.Add(id);
-            moveDirections.Add(Random.value > 0.5f ? 1f : -1f);
-            moveDistances.Add(Random.Range(minMoveDistance, maxMoveDistance));
-            startPositions.Add(position);
-
-            CollisionManager.Instance.UpdateMatrix(id, enemyMatrix);
-        }
-    }
-
-    void Update()
-    {
-        MoveEnemies();
-        CheckPlayerCollisions();
-        RenderEnemies();
-    }
-
-    void MoveEnemies()
-    {
-        if (meshGen == null) return;
-
-        for (int i = 0; i < enemyMatrices.Count; i++)
-        {
-            Vector3 currentPos = enemyMatrices[i].GetPosition();
-            Vector3 startPos = startPositions[i];
-            
-            float targetX = startPos.x + (moveDistances[i] * moveDirections[i]);
-            float newX = Mathf.MoveTowards(currentPos.x, targetX, moveSpeed * Time.deltaTime);
-            
-            if (Mathf.Approximately(newX, targetX))
-            {
-                moveDirections[i] *= -1f;
-                startPositions[i] = currentPos;
-            }
-
-            Vector3 newPos = new Vector3(
-                newX, 
-                meshGen.groundY + meshGen.height, // Maintain height above ground
-                currentPos.z
-            );
-            
-            enemyMatrices[i] = Matrix4x4.TRS(newPos, enemyMatrices[i].rotation, enemyMatrices[i].lossyScale);
-            
-            CollisionManager.Instance.UpdateCollider(
-                enemyColliderIds[i], 
-                newPos, 
-                new Vector3(enemySize, meshGen.height, enemySize)
-            );
-        }
-    }
-
-    void CheckPlayerCollisions()
-    {
-        if (GameManager.Instance == null || GameManager.Instance.IsPlayerInvincible()) return;
-        if (meshGen == null || meshGen.GetPlayerID() == -1) return;
-        if (Time.time - lastDamageTime < damageCooldown) return;
-
-        var playerMatrix = CollisionManager.Instance.GetMatrix(meshGen.GetPlayerID());
-        Vector3 playerPos = playerMatrix.GetPosition();
-        Vector3 playerSize = meshGen.GetPlayerSize();
-        float playerRadius = Mathf.Max(playerSize.x, playerSize.y, playerSize.z) * 0.5f;
-
-        bool playerHit = false;
-
-        for (int i = 0; i < enemyMatrices.Count; i++)
-        {
-            Vector3 enemyPos = enemyMatrices[i].GetPosition();
-            
-            float dx = playerPos.x - enemyPos.x;
-            float dy = playerPos.y - enemyPos.y;
-            float dz = playerPos.z - enemyPos.z;
-            float sqrDistance = dx * dx + dy * dy + dz * dz;
-            
-            float combinedRadius = playerRadius + enemySize;
-            if (sqrDistance < combinedRadius * combinedRadius)
-            {
-                playerHit = true;
-                break;
-            }
-        }
-
-        if (playerHit)
-        {
-            GameManager.Instance.TakeDamage(damageToPlayer);
-            lastDamageTime = Time.time;
-            Debug.Log($"Enemy hit player! Health: {GameManager.Instance.CurrentHealth}. Next damage in {damageCooldown} seconds.");
-        }
-    }
-
-    void RenderEnemies()
-    {
-        if (enemyMaterial == null || enemyMesh == null || enemyMatrices.Count == 0) return;
-
-        Camera mainCamera = Camera.main;
-        if (mainCamera == null) return;
-
-        List<Matrix4x4> visibleEnemies = new List<Matrix4x4>();
-
-        foreach (var matrix in enemyMatrices)
-        {
-            Vector3 enemyPos = matrix.GetPosition();
-            Vector3 viewportPos = mainCamera.WorldToViewportPoint(enemyPos);
-            
-            bool isVisible = viewportPos.x > -0.5f && viewportPos.x < 1.5f && 
-                            viewportPos.y > -0.5f && viewportPos.y < 1.5f &&
-                            viewportPos.z > mainCamera.nearClipPlane;
-
-            if (isVisible)
-            {
-                visibleEnemies.Add(matrix);
-            }
-            else
-            {
-                Matrix4x4 zeroScaleMatrix = Matrix4x4.TRS(
-                    enemyPos,
-                    matrix.rotation,
-                    Vector3.zero
-                );
-                visibleEnemies.Add(zeroScaleMatrix);
-            }
-        }
-
-        Matrix4x4[] matricesArray = visibleEnemies.ToArray();
-
-        for (int i = 0; i < matricesArray.Length; i += 1023)
-        {
-            int batchSize = Mathf.Min(1023, matricesArray.Length - i);
-            Graphics.DrawMeshInstanced(
-                enemyMesh,
+            Vector3 position = new Vector3(
+                Random.Range(-10f, 10f),
                 0,
-                enemyMaterial,
-                matricesArray,
-                batchSize,
-                null,
-                UnityEngine.Rendering.ShadowCastingMode.Off,
-                false
+                Random.Range(-10f, 10f)
             );
+
+            // Register with collision system
+            int id = CollisionManager.Instance.RegisterCollider(position, Vector3.one * enemySize, false);
+            enemyColliderIds.Add(id);
+            enemyMatrices.Add(Matrix4x4.TRS(position, Quaternion.identity, Vector3.one * enemySize));
+            startPositions.Add(position);
         }
     }
 
     public void DestroyEnemy(int colliderId)
     {
+        // Logic to destroy the enemy
         int index = enemyColliderIds.IndexOf(colliderId);
         if (index >= 0)
         {
             CollisionManager.Instance.RemoveCollider(colliderId);
-            enemyMatrices.RemoveAt(index);
             enemyColliderIds.RemoveAt(index);
-            moveDirections.RemoveAt(index);
-            moveDistances.RemoveAt(index);
+            enemyMatrices.RemoveAt(index);
             startPositions.RemoveAt(index);
+        }
+    }
+
+    void Update()
+    {
+        // Update enemy positions and check for player collisions
+        for (int i = 0; i < enemyColliderIds.Count; i++)
+        {
+            // Move enemies in a random direction
+            Vector3 currentPosition = enemyMatrices[i].GetPosition();
+            float moveDirection = Random.Range(-1f, 1f);
+            currentPosition.x += moveDirection * moveSpeed * Time.deltaTime;
+
+            // Check for collisions with the player or other objects
+            if (CollisionManager.Instance.CheckCollision(enemyColliderIds[i], currentPosition, out List<int> collidedIds))
+            {
+                foreach (int id in collidedIds)
+                {
+                    // Handle collision with player
+                    EnhancedMeshGenerator player = FindObjectOfType<EnhancedMeshGenerator>();
+                    if (player != null && id == player.GetPlayerID())
+                    {
+                        // Apply damage logic (you'll need to implement this)
+                        Debug.Log("Enemy hit player!");
+                        // Example: player.TakeDamage(damageToPlayer);
+                    }
+                }
+            }
+
+            // Update the enemy's position in the collision manager
+            enemyMatrices[i] = Matrix4x4.TRS(currentPosition, Quaternion.identity, Vector3.one * enemySize);
+            CollisionManager.Instance.UpdateMatrix(enemyColliderIds[i], enemyMatrices[i]);
+        }
+    }
+
+    void OnRenderObject()
+    {
+        // Render all enemies
+        for (int i = 0; i < enemyMatrices.Count; i++)
+        {
+            Graphics.DrawMesh(enemyMesh, enemyMatrices[i], enemyMaterial, 0);
         }
     }
 }

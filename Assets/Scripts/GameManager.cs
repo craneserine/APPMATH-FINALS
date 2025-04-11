@@ -6,31 +6,24 @@ public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
 
-    // Player stats
     [Header("Player Settings")]
-    public int maxHealth = 3;
+    public int maxHealth = 5;
     public float invincibilityDuration = 5f;
     private int currentHealth;
     private bool isInvincible = false;
-    // For Other Scripts
     public int CurrentHealth => currentHealth;
 
-    // UI Elements
     [Header("UI Elements")]
     public TMP_Text healthText;
     public TMP_Text timerText;
-    public GameObject gameOverPanel;
+    public TMP_Text gameOverText; // Changed from gameOverPanel to TMP_Text
 
-    // Game state
     [Header("Game Settings")]
-    public float gameDuration = 180f; // 3 minutes
+    public float gameDuration = 180f;
     private float currentTime;
     private bool gameRunning = true;
 
-    // Power-up references
     private PowerUpManager powerUpManager;
-    
-    
 
     void Awake()
     {
@@ -55,9 +48,9 @@ public class GameManager : MonoBehaviour
     {
         currentHealth = maxHealth;
         currentTime = gameDuration;
+        gameOverText.gameObject.SetActive(false); // Hide game over text at start
         UpdateHealthUI();
         UpdateTimerUI();
-        gameOverPanel.SetActive(false);
         gameRunning = true;
         StartCoroutine(GameTimer());
     }
@@ -80,19 +73,13 @@ public class GameManager : MonoBehaviour
 
     public void TakeDamage(int damage)
     {
-        if (isInvincible) 
-        {
-            Debug.Log("Damage blocked by invincibility!");
-            return;
-        }
+        if (isInvincible) return;
 
         currentHealth -= damage;
-        Debug.Log($"Player took {damage} damage! Health: {currentHealth}/{maxHealth}");
         UpdateHealthUI();
 
         if (currentHealth <= 0)
         {
-            Debug.Log("Player died!");
             GameOver("You died!");
         }
     }
@@ -114,8 +101,10 @@ public class GameManager : MonoBehaviour
     IEnumerator InvincibilityRoutine()
     {
         isInvincible = true;
+        UpdateHealthUI(); // Update color
         yield return new WaitForSeconds(invincibilityDuration);
         isInvincible = false;
+        UpdateHealthUI(); // Revert color
     }
 
     void UpdateHealthUI()
@@ -123,8 +112,6 @@ public class GameManager : MonoBehaviour
         if (healthText != null)
         {
             healthText.text = $"HP: {currentHealth}/{maxHealth}";
-            
-            // Visual feedback when invincible
             healthText.color = isInvincible ? Color.yellow : Color.white;
         }
     }
@@ -142,16 +129,9 @@ public class GameManager : MonoBehaviour
     void GameOver(string reason)
     {
         gameRunning = false;
-        gameOverPanel.SetActive(true);
-        
-        // Update game over text if needed
-        TMP_Text gameOverText = gameOverPanel.GetComponentInChildren<TMP_Text>();
-        if (gameOverText != null)
-        {
-            gameOverText.text = $"Game Over\n{reason}";
-        }
-        
-        Time.timeScale = 0f; // Pause game
+        gameOverText.gameObject.SetActive(true);
+        gameOverText.text = $"GAME OVER\n{reason}";
+        Time.timeScale = 0f;
     }
 
     public void RestartGame()
@@ -161,8 +141,5 @@ public class GameManager : MonoBehaviour
             UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
     }
 
-    public bool IsPlayerInvincible()
-    {
-        return isInvincible;
-    }
+    public bool IsPlayerInvincible() => isInvincible;
 }
