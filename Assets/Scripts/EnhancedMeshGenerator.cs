@@ -8,57 +8,79 @@ using Vector3 = UnityEngine.Vector3;
 // Enhanced MeshGenerator with collision, player control, and camera following
 public class EnhancedMeshGenerator : MonoBehaviour
 {
-    public Material material;
+    [Header("Mesh Generation Settings")]
+    [Tooltip("Number of cube instances to generate")]
     public int instanceCount = 100;
-    private Mesh cubeMesh;
-    private List<Matrix4x4> matrices = new List<Matrix4x4>();
-    private List<int> colliderIds = new List<int>();
-    
+    [Tooltip("Width of each cube unit")]
     public float width = 1f;
+    [Tooltip("Height of each cube unit")]
     public float height = 1f;
+    [Tooltip("Depth of each cube unit")]
     public float depth = 1f;
-    
+    private Mesh cubeMesh;
+
+    [Header("Collision System")]
+    [Tooltip("List of transformation matrices for all objects")]
+    private List<Matrix4x4> matrices = new List<Matrix4x4>();
+    [Tooltip("Collider IDs from CollisionManager")]
+    private List<int> colliderIds = new List<int>();
+
+    [Header("Player Movement Settings")]
+    [Tooltip("Base movement speed in units/second")]
     public float movementSpeed = 5f;
+    [Tooltip("Gravity force applied when airborne")]
     public float gravity = 9.8f;
-    
-    private int playerID = -1;
+
+    [Header("Player State")]
+    [Tooltip("Current player velocity vector")]
     private Vector3 playerVelocity = Vector3.zero;
+    [Tooltip("Is the player touching the ground?")]
     private bool isGrounded = false;
-    
-    // For Other Scripts
+    [Tooltip("Player's collider ID in CollisionManager")]
+    private int playerID = -1;
+
+// For other scripts
     public int GetPlayerID() => playerID;
     public List<Matrix4x4> GetMatrices() => matrices;
     public List<int> GetColliderIds() => colliderIds;
     public Vector3 GetPlayerSize() => new Vector3(width, height, depth);
     
-    // Camera reference
+    [Header("Camera Reference")] 
     public PlayerCameraFollow cameraFollow;
     
-    // Z-position constant for all boxes
+    [Header("Z-position Constant for All Boxes")]
     public float constantZPosition = 0f;
     
-    // Range for random generation
+    [Header("Range for Random Generation")]
     public float minX = -50f;
     public float maxX = 50f;
     public float minY = -50f;
     public float maxY = 50f;
     
-    // Ground plane settings
+    [Header("Ground Plane Settings")]
     public float groundY = -20f;
     public float groundWidth = 200f;
     public float groundDepth = 200f;
     
-    // For Jumping
+    [Header("Jumping Settings")]
     public float jumpForce = 8f;
     private bool canJump = true;
     public float gravityScale = 2f;
     public float airMovementMultiplier = 0.5f;
 
-    // For Fireballs
+    [Header("Fireball Settings")]
     public GameObject fireballPrefab;
     private bool canShootFireballs = false;
     private float lastFireballTime = 0f;
     public float fireballCooldown = 0.5f;
+    
+    public void EnableFireballShooting()
+    {
+        canShootFireballs = true;
+    }
+
+    [Header("Rendering Settings")]
+    public Material material;
 
     void Start()
     {
@@ -342,12 +364,6 @@ public class EnhancedMeshGenerator : MonoBehaviour
         {
             cameraFollow.SetPlayerPosition(pos);
         }
-
-        // Fireball shooting logic
-        if (canShootFireballs && Input.GetKeyDown(KeyCode.F))
-        {
-            ShootFireball();
-        }
     }
         
     bool CheckCollisionAt(int id, Vector3 position)
@@ -357,6 +373,8 @@ public class EnhancedMeshGenerator : MonoBehaviour
     
     void RenderBoxes()
     {
+        if (material == null) return;  // Safety check
+        
         // Convert list to array for Graphics.DrawMeshInstanced
         Matrix4x4[] matrixArray = matrices.ToArray();
         
@@ -410,21 +428,21 @@ public class EnhancedMeshGenerator : MonoBehaviour
     void ShootFireball()
     {
         if (Time.time - lastFireballTime < fireballCooldown) return;
-
+        
         lastFireballTime = Time.time;
-
+        
         Vector3 playerPos = matrices[colliderIds.IndexOf(playerID)].GetPosition();
         Vector3 fireDirection = Vector3.right; // Default to right
-
+        
         // Get facing direction based on movement input
         float horizontal = Input.GetAxis("Horizontal");
         if (Mathf.Abs(horizontal) > 0.1f)
         {
             fireDirection = new Vector3(Mathf.Sign(horizontal), 0, 0);
         }
-
+        
         GameObject fireballObj = Instantiate(fireballPrefab);
         Fireball fireball = fireballObj.GetComponent<Fireball>();
-        fireball.Initialize(playerPos + fireDirection, fireDirection);
+        fireball.Initialize(playerPos + fireDirection * 1.5f, fireDirection);
     }
 }

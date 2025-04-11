@@ -3,17 +3,36 @@ using System.Collections.Generic;
 
 public class Fireball : MonoBehaviour
 {
-    public float speed = 15f; // Fast speed for fireball
-    public float lifetime = 2f; // Shorter lifetime
-    public int damage = 1;
-    public float size = 0.5f;
-    public Material fireballMaterial; // Assign in inspector
-    
-    private int colliderId;
-    private float spawnTime;
+[Header("Movement Settings")]
+    [Tooltip("Speed of the fireball in units per second")]
+    public float speed = 15f;
+    [Tooltip("How long the fireball lasts before disappearing")]
+    public float lifetime = 2f;
+    [Tooltip("Directional movement vector (auto-set on initialization)")]
     private Vector3 direction;
+
+    [Header("Combat Settings")]
+    [Tooltip("Damage dealt to enemies on hit")]
+    public int damage = 1;
+    
+    [Header("Visual Settings")]
+    [Tooltip("Size of the fireball mesh")]
+    public float size = 0.5f;
+    [Tooltip("Material for rendering the fireball")]
+    public Material fireballMaterial;
+    
+    [Header("Collision Settings")]
+    [Tooltip("Collider ID from CollisionManager")]
+    private int colliderId;
+
+    [Header("Runtime Variables")]
+    [Tooltip("Time when fireball was spawned")]
+    private float spawnTime;
+    [Tooltip("Fireball mesh for rendering")]
     private Mesh fireballMesh;
+    [Tooltip("Transform matrix for rendering")]
     private Matrix4x4 fireballMatrix;
+    [Tooltip("Main camera reference")]
     private Camera mainCamera;
 
     void Awake()
