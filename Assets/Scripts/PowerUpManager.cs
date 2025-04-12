@@ -37,18 +37,20 @@ public class PowerUpManager : MonoBehaviour
 
     void CreatePowerUpMeshes()
     {
+        // Create triangle mesh for health power-ups
         triangleMesh = new Mesh();
         Vector3[] triangleVertices = new Vector3[4]
         {
             new Vector3(0, 0, 0),
             new Vector3(powerUpSize, 0, 0),
-            new Vector3(powerUpSize/2, 0, powerUpSize),
-            new Vector3(powerUpSize/2, powerUpSize, powerUpSize/2)
+            new Vector3(powerUpSize / 2, 0, powerUpSize),
+            new Vector3(powerUpSize / 2, powerUpSize, powerUpSize / 2)
         };
         triangleMesh.vertices = triangleVertices;
         triangleMesh.triangles = new int[12] { 0, 2, 1, 0, 1, 3, 1, 2, 3, 2, 0, 3 };
         triangleMesh.RecalculateNormals();
 
+        // Create quad mesh for invincibility power-ups
         quadMesh = new Mesh();
         Vector3[] quadVertices = new Vector3[4]
         {
@@ -65,6 +67,8 @@ public class PowerUpManager : MonoBehaviour
     void SpawnPowerUps()
     {
         float playerStartX = 0f;
+        float rightSideLength = meshGenerator.maxX - playerStartX;
+        float sectionLength = rightSideLength / powerUpCount;
 
         for (int i = 0; i < powerUpCount; i++)
         {
@@ -76,13 +80,13 @@ public class PowerUpManager : MonoBehaviour
             do
             {
                 position = new Vector3(
-                    Random.Range(playerStartX + 5f, meshGenerator.maxX - spawnPadding),
+                    Random.Range(playerStartX + spawnPadding, meshGenerator.maxX - spawnPadding),
                     meshGenerator.groundY + powerUpHeight,
                     meshGenerator.constantZPosition
                 );
 
                 positionValid = true;
-                
+
                 // Check against other power-ups
                 for (int j = 0; j < powerUpMatrices.Count; j++)
                 {
@@ -106,12 +110,12 @@ public class PowerUpManager : MonoBehaviour
             Vector3 scale = Vector3.one;
 
             int id = CollisionManager.Instance.RegisterCollider(
-                position, 
-                new Vector3(powerUpSize, powerUpSize, powerUpSize), 
+                position,
+                new Vector3(powerUpSize, powerUpSize, powerUpSize),
                 false);
 
             Matrix4x4 powerUpMatrix = Matrix4x4.TRS(position, rotation, scale);
-            powerUpMatrices.Add(powerUpMatrix);
+                        powerUpMatrices.Add(powerUpMatrix);
             powerUpColliderIds.Add(id);
             powerUpTypes.Add(type);
 
@@ -128,28 +132,28 @@ public class PowerUpManager : MonoBehaviour
     void CheckPlayerCollision()
     {
         if (meshGenerator.GetPlayerID() == -1) return;
-        
+
         var playerMatrix = CollisionManager.Instance.GetMatrix(meshGenerator.GetPlayerID());
         Vector3 playerPos = playerMatrix.GetPosition();
         Vector3 playerSize = meshGenerator.GetPlayerSize();
         float playerRadius = Mathf.Max(playerSize.x, playerSize.y, playerSize.z) * 0.5f;
-        
+
         for (int i = powerUpColliderIds.Count - 1; i >= 0; i--)
         {
             int powerUpId = powerUpColliderIds[i];
             var powerUpMatrix = CollisionManager.Instance.GetMatrix(powerUpId);
             Vector3 powerUpPos = powerUpMatrix.GetPosition();
-            
+
             float dx = playerPos.x - powerUpPos.x;
             float dy = playerPos.y - powerUpPos.y;
             float dz = playerPos.z - powerUpPos.z;
             float sqrDistance = dx * dx + dy * dy + dz * dz;
-            
+
             float combinedRadius = playerRadius + powerUpSize;
             if (sqrDistance < combinedRadius * combinedRadius)
             {
                 ApplyPowerUpEffect(powerUpTypes[i]);
-                
+
                 CollisionManager.Instance.RemoveCollider(powerUpId);
                 powerUpMatrices.RemoveAt(i);
                 powerUpColliderIds.RemoveAt(i);
@@ -158,26 +162,26 @@ public class PowerUpManager : MonoBehaviour
         }
     }
 
-    // Add this to the PowerUpManager's ApplyPowerUpEffect method
-    void ApplyPowerUpEffect(PowerUpType type)
+    private void ApplyPowerUpEffect(PowerUpType type)
     {
         if (GameManager.Instance == null) return;
 
         switch (type)
         {
             case PowerUpType.Health:
-                Debug.Log("Health power-up collected! Extra life gained.");
+                Debug.Log("Life Increased!");
                 GameManager.Instance.HealPlayer(1);
                 break;
-            
+
             case PowerUpType.Invincibility:
-                Debug.Log("Invincibility power-up collected! Enemies will die on contact.");
+                Debug.Log("Invincibility activated for five seconds!");
                 GameManager.Instance.ActivateInvincibility();
                 break;
-            
+
             case PowerUpType.Fireball:
-                Debug.Log("Fireball power-up collected! You can now shoot fireballs!");
-                // Implement fireball shooting logic here
+                Debug.Log("You can shoot a fireball!");
+                // Enable fireball shooting through the EnhancedMeshGenerator
+                meshGenerator.EnableFireballShooting();
                 break;
         }
     }
@@ -185,7 +189,7 @@ public class PowerUpManager : MonoBehaviour
     void RenderPowerUps()
     {
         if (powerUpMatrices.Count == 0) return;
-        
+
         Camera mainCamera = Camera.main;
         if (mainCamera == null) return;
 
@@ -198,12 +202,12 @@ public class PowerUpManager : MonoBehaviour
         {
             Vector3 powerUpPos = powerUpMatrices[i].GetPosition();
             Vector3 viewportPos = mainCamera.WorldToViewportPoint(powerUpPos);
-            
-            bool isVisible = viewportPos.x > -0.5f && viewportPos.x < 1.5f && 
-                           viewportPos.y > -0.5f && viewportPos.y < 1.5f &&
-                           viewportPos.z > mainCamera.nearClipPlane;
 
-            Matrix4x4 matrix = isVisible ? powerUpMatrices[i] : 
+            bool isVisible = viewportPos.x > -0.5f && viewportPos.x < 1.5f &&
+                             viewportPos.y > -0.5f && viewportPos.y < 1.5f &&
+                             viewportPos.z > mainCamera.nearClipPlane;
+
+            Matrix4x4 matrix = isVisible ? powerUpMatrices[i] :
                 Matrix4x4.TRS(powerUpPos, powerUpMatrices[i].rotation, Vector3.zero);
 
             switch (powerUpTypes[i])
@@ -242,15 +246,14 @@ public class PowerUpManager : MonoBehaviour
     void RenderPowerUpBatch(Mesh mesh, Material material, List<Matrix4x4> matrices)
     {
         Matrix4x4[] matrixArray = matrices.ToArray();
-        
         for (int i = 0; i < matrixArray.Length; i += 1023)
         {
             int batchSize = Mathf.Min(1023, matrixArray.Length - i);
             Graphics.DrawMeshInstanced(
-                mesh, 
-                0, 
-                material, 
-                matrixArray, 
+                mesh,
+                0,
+                material,
+                matrixArray,
                 batchSize,
                 null,
                 UnityEngine.Rendering.ShadowCastingMode.Off,

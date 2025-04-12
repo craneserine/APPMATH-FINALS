@@ -58,7 +58,7 @@ public class EnhancedMeshGenerator : MonoBehaviour
     public float maxY = 50f;
     
     [Header("Ground Plane Settings")]
-    public float groundY = -20f;
+    public float groundY = 10f;
     public float groundWidth = 200f;
     public float groundDepth = 200f;
     
